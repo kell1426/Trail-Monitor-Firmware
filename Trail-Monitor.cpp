@@ -13,11 +13,11 @@ const uint8_t chipSelect = D5;
 //------------------------------------------------------------------------------
 // TEST
 
+
 File myFile;
 AssetTracker t = AssetTracker();
 int transmittingData = 1;
 long lastPublish = 0;
-int delayMinutes = 1;
 
 void setup()
 {
@@ -30,6 +30,7 @@ void setup()
 
   t.begin();	//Set up Asset Tracker bits
   t.gpsOn();	//Initialize GPS Module
+  Particle.syncTime();
 
   // Initialize SdFat or print a detailed error message and halt
   // Use half speed like the native library.
@@ -39,13 +40,10 @@ void setup()
     sd.initErrorHalt();
   }
 
-  // read from the file until there's nothing else in it:
-  int data;
-  while ((data = myFile.read()) >= 0)
+  if (!myFile.open("test.txt", O_RDWR | O_CREAT | O_AT_END))
   {
-    Serial.write(data);
+    sd.errorHalt("opening test.txt for write failed");
   }
-  // close the file:
   myFile.close();
 }
 
@@ -54,16 +52,16 @@ void loop()
 	t.updateGPS();
 
   // if the current time - the last time we published is greater than your set delay...
-	if (millis()-lastPublish > delayMinutes*60*1000)
+	if (millis()-lastPublish > (60 * 1000)) //60 SECOND DELAY
 	{
         // Remember when we published
 		lastPublish = millis();
 
-		if(t.gpsFix())
+		if(t.gpsFix() /* && Speed (Vehicle Moving)*/)
 		{
-			float lat = t.readLat();
-			float lon = t.readLon();
-			uint32_t time = t.getGpsTimestamp();
+			float lat = t.readLatDeg();
+			float lon = t.readLonDeg();
+			uint32_t epoch = Time.local();
 			int accel = t.readZ();
 			int harsh; //Look into which direction to use
 			if(accel < 12000)
@@ -102,43 +100,45 @@ void loop()
 			{
 				harsh = 9;
 			}
+		  String lats = String::format("%f", lat);
+		  Particle.publish("GPS", lats, PRIVATE);
+		  String lons = String::format("%f", lon);
+	      Particle.publish("Lon", lons, PRIVATE);
+	      String epochs = String::format("%lu", epoch);
+	      Particle.publish("Time", epochs, PRIVATE);
 
-			String data = String::format("%f", "%f", "%lu", "%d", lat, lon, time, harsh);
-
-		    if (!myFile.open("test.txt", O_RDWR | O_CREAT | O_AT_END))
+          String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
+          String data = String::format("{ \"Lat\": \"%s\", \"Lon\": \"%s\", \"Time\": \"%s\", \"Harsh\": \"%s\"}", lat, lon, epoch, harsh);
+		  if (!myFile.open("test.txt", O_RDWR | O_CREAT | O_AT_END))
 			{
 				sd.errorHalt("opening test.txt for write failed");
 			}
-			myFile.println(data);
-			myFile.close();
+          myFile.println(test_data);
+          myFile.println(data);
+	      myFile.close();
+          Particle.publish("Test Data", test_data, PRIVATE);
 	   }
    }
-   if(//cell service is detected)
-   {
-	    String parse[4];
-		//Open File in read/write mode
-		if (!myFile.open("test.txt", O_RDWR))
-		{
-			sd.errorHalt("opening test.txt for read failed");
-		}
-
-		//Read data from SD card and delete it after the read
-		String read = myFile.read();
-
-		//Parse the data on each comma and store variables into parse[]
-
-		myFile.close();
-
-		//Format it to Key:Value JSON format
-		String data = String::format("{ "\Lat\": \"%s\", \"Lon\": \"%s\", \"Time\": \"%s\", \"Harsh\": \"%s\"}", parse[0], parse[1], parse[2], parse[3]);
-
-		//Send data to website
-		Particle.publish("Heat", data, PRIVATE);
-
-
-
-
-
-   }
+ // if(Cellular.ready() /* && Speed (Vehicle Not Moving)*/)
+ //   {
+	// 	//Open File in read/write mode
+	// 	if (!myFile.open("test.txt", O_RDWR))
+	// 	{
+	// 		sd.errorHalt("opening test.txt for read failed");
+	// 	}
+ //
+	// 	//Read data from SD card and delete it after the read
+	// 	String data = myFile.read();
+ //
+	// 	myFile.close();
+ //
+	// 	//Send data to website
+	// 	Particle.publish("Heat", data, PRIVATE);
+ //
+ //
+ //
+ //
+ //
+ //  }
 
 }
