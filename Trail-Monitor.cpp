@@ -52,7 +52,7 @@ void loop()
 	t.updateGPS();
 
   // if the current time - the last time we published is greater than your set delay...
-	if (millis()-lastPublish > (60 * 1000)) //60 SECOND DELAY
+	if (millis()-lastPublish > (5000)) //5 SECOND DELAY
 	{
         // Remember when we published
 		lastPublish = millis();
@@ -100,23 +100,23 @@ void loop()
 			{
 				harsh = 9;
 			}
-		  String lats = String::format("%f", lat);
-		  Particle.publish("GPS", lats, PRIVATE);
-		  String lons = String::format("%f", lon);
-	      Particle.publish("Lon", lons, PRIVATE);
-	      String epochs = String::format("%lu", epoch);
-	      Particle.publish("Time", epochs, PRIVATE);
-
-          String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
-          String data = String::format("{ \"Lat\": \"%s\", \"Lon\": \"%s\", \"Time\": \"%s\", \"Harsh\": \"%s\"}", lat, lon, epoch, harsh);
+		  //String lats = String::format("%f", lat);
+		  //Particle.publish("GPS", lats, PRIVATE);
+		  //String lons = String::format("%f", lon);
+	   //   Particle.publish("Lon", lons, PRIVATE);
+	   //   String epochs = String::format("%lu", epoch);
+	   //   Particle.publish("Time", epochs, PRIVATE);
+        String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
+        Particle.publish("Test Data", test_data, PRIVATE);
+        //String data = String::format("{ \"Lat\": \"%s\", \"Lon\": \"%s\", \"Time\": \"%s\", \"Harsh\": \"%s\"}", lat, lon, epoch, harsh);
 		  if (!myFile.open("test.txt", O_RDWR | O_CREAT | O_AT_END))
 			{
 				sd.errorHalt("opening test.txt for write failed");
 			}
           myFile.println(test_data);
-          myFile.println(data);
+          //myFile.println(data);
 	      myFile.close();
-          Particle.publish("Test Data", test_data, PRIVATE);
+
 	   }
    }
  // if(Cellular.ready() /* && Speed (Vehicle Not Moving)*/)
