@@ -40,21 +40,23 @@ void setup()
     sd.initErrorHalt();
   }
 
-  if (!myFile.open("test.txt", O_RDWR | O_CREAT | O_AT_END))
+  if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
   {
-    sd.errorHalt("opening test.txt for write failed");
+    sd.errorHalt("opening TrailData.txt for write failed");
   }
   myFile.close();
+
+  Cellular.disconnect();
 }
 
 void loop()
 {
 	t.updateGPS();
-
+  int speedCounter;
   // if the current time - the last time we published is greater than your set delay...
 	if (millis()-lastPublish > (5000)) //5 SECOND DELAY
 	{
-        // Remember when we published
+    // Remember when we published
 		lastPublish = millis();
 
 		if(t.gpsFix() /* && Speed (Vehicle Moving)*/)
@@ -106,39 +108,86 @@ void loop()
 	   //   Particle.publish("Lon", lons, PRIVATE);
 	   //   String epochs = String::format("%lu", epoch);
 	   //   Particle.publish("Time", epochs, PRIVATE);
-        String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
-        Particle.publish("Test Data", test_data, PRIVATE);
-        //String data = String::format("{ \"Lat\": \"%s\", \"Lon\": \"%s\", \"Time\": \"%s\", \"Harsh\": \"%s\"}", lat, lon, epoch, harsh);
-		  if (!myFile.open("test.txt", O_RDWR | O_CREAT | O_AT_END))
+      //String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
+      //Particle.publish("Test Data", test_data, PRIVATE);
+      String data = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%lu\", \"Harsh\": \"%d\"}", lat, lon, epoch, harsh);
+		  if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
 			{
-				sd.errorHalt("opening test.txt for write failed");
+				sd.errorHalt("opening TrailData.txt for write failed");
 			}
-          myFile.println(test_data);
-          //myFile.println(data);
+          //myFile.println(test_data);
+        myFile.println(data);
 	      myFile.close();
 
 	   }
    }
- // if(Cellular.ready() /* && Speed (Vehicle Not Moving)*/)
- //   {
-	// 	//Open File in read/write mode
-	// 	if (!myFile.open("test.txt", O_RDWR))
-	// 	{
-	// 		sd.errorHalt("opening test.txt for read failed");
-	// 	}
- //
-	// 	//Read data from SD card and delete it after the read
-	// 	String data = myFile.read();
- //
-	// 	myFile.close();
- //
-	// 	//Send data to website
-	// 	Particle.publish("Heat", data, PRIVATE);
- //
- //
- //
- //
- //
- //  }
+ //Version 1. This one can be used if we want to attempt to send data while the vehicle is moving. Code not complete
+ if(Cellular.ready())
+   {
+		//Open File in read/write mode
+		if (!myFile.open("TrailData.txt", O_RDWR))
+		{
+			sd.errorHalt("opening TrailData.txt for read failed");
+		}
+
+		//Read data from SD card and delete it after the read
+    int endOfFile = 0;
+    /*String*/int data;
+    while(Cellular.ready())
+    {
+      if((data = myFile.read()) >= 0)
+      {
+        endOfFile = 1;
+        break;
+      }
+      Particle.publish("Heat", data, PRIVATE);
+    }
+    File myFile2;
+    if (!myFile2.open("temp.txt", O_RDWR | O_CREAT | O_AT_END))
+    {
+      sd.errorHalt("opening temp.txt for write failed");
+    }
+    if(endOfFile == 0)
+    {
+      while((data = myFile.read()) >= 0)
+      {
+        myFile2.println(data)
+      }
+    }
+    myFile.close();
+    myFile2.close();
+    remove("TrailData.txt");
+    rename("temp.txt", "TrailData.txt");
+
+  }
+
+  //Version 2. This one can be used if we want to send data while the vehicle has stopped for a while. Code not complete.
+  if(t.getSpeed() <= "some value")
+  {
+    speedCounter++;
+  }
+  else
+  {
+    speedCounter = 0;
+  }
+
+  if(speedCounter > 10000) //Will have to test how quicly speed counter increases
+  {
+    Cellular.connect(); //Manually connect to cellular
+    while(!Cellular.ready()); //Wait for cellular connection to be established.
+    if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT))
+    {
+      sd.errorHalt("opening TrailData.txt for read failed");
+    }
+    String data;
+    while((data = myFile.read()) >= 0)
+    {
+      Particle.publish("Heat", data, PRIVATE);
+    }
+    myFile.close();
+    remove("TrailData.txt");
+    speedCounter = 0;
+    //Put device into low power mode
+  }
 
 }
