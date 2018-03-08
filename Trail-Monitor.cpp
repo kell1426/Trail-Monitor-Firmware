@@ -18,7 +18,7 @@ AssetTracker t = AssetTracker();
 int transmittingData = 1;
 long lastPublish = 0;
 long lastSpeedCheck = 0;
-String data[100];
+String data[50];
 int i = 0;
 int j = 0;
 bool writetime = false;
@@ -83,7 +83,7 @@ void setup()
 
   //Cellular.disconnect();
 
-  for (i = 0; i < 100; i++) {
+  for (i = 0; i < 50; i++) {
     data[i]="";
   }
 }
@@ -151,7 +151,7 @@ void loop()
       //Particle.publish("Test Data", test_data, PRIVATE);
       data[j] = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%lu\", \"Harsh\": \"%d\"}", lat, lon, epoch, harsh);
 	    j++;
-      if(j == 100)
+      if(j == 50)
       {
         writetime = true;
         j=0;
@@ -199,7 +199,7 @@ void loop()
  //  }
 
   //Version 2. This one can be used if we want to send data while the vehicle has stopped for a while. Code not complete.
-if(writetime) //10 SECOND DELAY
+if(writetime) //5 SECOND DELAY
 { // Check Speed, if slow increment counter
   if(t.getSpeed() <= 2) //2 knots
   {
@@ -214,7 +214,7 @@ if(writetime) //10 SECOND DELAY
     {
       sd.errorHalt("opening TrailData.txt for write failed");
     }
-    for(i = 0; i < 100; i++)
+    for(i = 0; i < 50; i++)
     {
       myFile.print(data[i]+"\n");
       data[i] = "";
@@ -222,7 +222,7 @@ if(writetime) //10 SECOND DELAY
     myFile.close();
   }
 }
-  if(speedCounter > 30) //If speedCounter is greater than 5 minutes
+  if(speedCounter > 60) //If speedCounter is greater than 5 minutes
   {
     Cellular.on();  //Turn on cellular module
     Cellular.connect(); //Manually connect to cellular
