@@ -23,7 +23,7 @@ int i = 0;
 int j = 0;
 bool writetime = false;
 String speed[50];
-//uint32_t initialTime = 0;
+uint32_t initialTime = 0;
 
 void setup()
 {
@@ -50,7 +50,7 @@ void setup()
   // }
   while(1)
   {
-    t.updateGPS()
+    t.updateGPS();
     if(t.gpsFix())
     {
       break;
@@ -77,7 +77,7 @@ void setup()
   while(!Cellular.ready());
   Particle.connect();
   Particle.syncTime();  //May need to change timestamp to GPS based
-  //initialTime = Time.local() * 1000;
+  initialTime = Time.local() * 1000;
 
   // Initialize SdFat or print a detailed error message and halt
   // Use half speed like the native library.
@@ -110,9 +110,9 @@ void loop()
 		{
 			float lat = t.readLatDeg();
 			float lon = t.readLonDeg();
-			uint32_t epoch = Time.local(); //May be able to call Time.local() in setup and store (Time.local() * 1000) in a variable
+			//uint32_t epoch = Time.local(); //May be able to call Time.local() in setup and store (Time.local() * 1000) in a variable
                                      //Then set eopch to variable + millis();
-      //uint32_t epoch = initialTime + millis();
+      uint32_t epoch = initialTime + millis();
 			int accel = t.readZ();
 			int harsh; //Look into which direction to use
 			if(accel < 12000)
