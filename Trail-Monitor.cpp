@@ -11,13 +11,18 @@ SdFatSoftSpi<D3, D2, D4> sd;
 const uint8_t chipSelect = D5;
 #endif  // SPI_CONFIGURATION
 //------------------------------------------------------------------------------
-// TEST
-
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 File myFile;
 AssetTracker t = AssetTracker();
 int transmittingData = 1;
 long lastPublish = 0;
+long lastSpeedCheck = 0;
+String data[100];
+int i = 0;
+int j = 0;
+bool writetime = false;
+int speedCounter = 0;
 
 void setup()
 {
@@ -29,8 +34,27 @@ void setup()
   }
 
   t.begin();	//Set up Asset Tracker bits
+  Cellular.off();
   t.gpsOn();	//Initialize GPS Module
-  Particle.syncTime();
+  delay(5000); //5 second delay
+  t.updateGPS();
+  if(t.getSpeed() <= 2)
+  {
+    System.sleep(30); //Sleep for 30 seconds
+    if(t.getSpeed() <= 2)
+    {
+      System.sleep(60);  //Sleep for 60 seconds
+      if(t.getSpeed() <= 2)
+      {
+        System.sleep(SLEEP_MODE_SOFTPOWEROFF, 600);  //Dead to us, Sleep for 10 minutes
+      }
+    }
+  }
+  // Cellular.on();
+  // Cellular.connect();
+  // while()
+  // Particle.connect();
+  Particle.syncTime();  //May need to change timestamp to GPS based
 
   // Initialize SdFat or print a detailed error message and halt
   // Use half speed like the native library.
@@ -39,14 +63,17 @@ void setup()
   {
     sd.initErrorHalt();
   }
+  // if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
+  // {
+  //   sd.errorHalt("opening TrailData.txt for write failed");
+  // }
+  // myFile.close();
 
-  if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
-  {
-    sd.errorHalt("opening TrailData.txt for write failed");
+  //Cellular.disconnect();
+
+  for (i = 0; i < 100; i++) {
+    data[i]="";
   }
-  myFile.close();
-
-  Cellular.disconnect();
 }
 
 void loop()
@@ -54,12 +81,12 @@ void loop()
 	t.updateGPS();
   int speedCounter;
   // if the current time - the last time we published is greater than your set delay...
-	if (millis()-lastPublish > (5000)) //5 SECOND DELAY
+	if (millis()-lastPublish > (100)) //100ms SECOND DELAY
 	{
     // Remember when we published
 		lastPublish = millis();
 
-		if(t.gpsFix() /* && Speed (Vehicle Moving)*/)
+		if(t.gpsFix())
 		{
 			float lat = t.readLatDeg();
 			float lon = t.readLonDeg();
@@ -110,84 +137,98 @@ void loop()
 	   //   Particle.publish("Time", epochs, PRIVATE);
       //String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
       //Particle.publish("Test Data", test_data, PRIVATE);
-      String data = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%lu\", \"Harsh\": \"%d\"}", lat, lon, epoch, harsh);
-		  if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
-			{
-				sd.errorHalt("opening TrailData.txt for write failed");
-			}
-          //myFile.println(test_data);
-        myFile.println(data);
-	      myFile.close();
-
+      data[j] = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%lu\", \"Harsh\": \"%d\"}", lat, lon, epoch, harsh);
+	    j++;
+      if(j == 100)
+      {
+        writetime = true;
+        j=0;
+      }
 	   }
    }
  //Version 1. This one can be used if we want to attempt to send data while the vehicle is moving. Code not complete
- if(Cellular.ready())
-   {
-		//Open File in read/write mode
-		if (!myFile.open("TrailData.txt", O_RDWR))
-		{
-			sd.errorHalt("opening TrailData.txt for read failed");
-		}
-
-		//Read data from SD card and delete it after the read
-    int endOfFile = 0;
-    /*String*/int data;
-    while(Cellular.ready())
-    {
-      if((data = myFile.read()) >= 0)
-      {
-        endOfFile = 1;
-        break;
-      }
-      Particle.publish("Heat", data, PRIVATE);
-    }
-    File myFile2;
-    if (!myFile2.open("temp.txt", O_RDWR | O_CREAT | O_AT_END))
-    {
-      sd.errorHalt("opening temp.txt for write failed");
-    }
-    if(endOfFile == 0)
-    {
-      while((data = myFile.read()) >= 0)
-      {
-        myFile2.println(data)
-      }
-    }
-    myFile.close();
-    myFile2.close();
-    remove("TrailData.txt");
-    rename("temp.txt", "TrailData.txt");
-
-  }
+ // if(Cellular.ready())
+ //   {
+	// 	//Open File in read/write mode
+	// 	if (!myFile.open("TrailData.txt", O_RDWR))
+	// 	{
+	// 		sd.errorHalt("opening TrailData.txt for read failed");
+	// 	}
+ //
+	// 	//Read data from SD card and delete it after the read
+ //    int endOfFile = 0;
+ //    /*String*/int data;
+ //    while(Cellular.ready())
+ //    {
+ //      if((data = myFile.read()) >= 0)
+ //      {
+ //        endOfFile = 1;
+ //        break;
+ //      }
+ //      Particle.publish("Heat", data, PRIVATE);
+ //    }
+ //    File myFile2;
+ //    if (!myFile2.open("temp.txt", O_RDWR | O_CREAT | O_AT_END))
+ //    {
+ //      sd.errorHalt("opening temp.txt for write failed");
+ //    }
+ //    if(endOfFile == 0)
+ //    {
+ //      while((data = myFile.read()) >= 0)
+ //      {
+ //        myFile2.println(data)
+ //      }
+ //    }
+ //    myFile.close();
+ //    myFile2.close();
+ //    remove("TrailData.txt");
+ //    rename("temp.txt", "TrailData.txt");
+ //
+ //  }
 
   //Version 2. This one can be used if we want to send data while the vehicle has stopped for a while. Code not complete.
-  if(t.getSpeed() <= "some value")
+if(writetime) //10 SECOND DELAY
+{ // Check Speed, if slow increment counter
+  if(t.getSpeed() <= 2) //2 knots
   {
     speedCounter++;
   }
   else
   {
+    // Data is valid, write it
     speedCounter = 0;
+    int i;
+    if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
+    {
+      sd.errorHalt("opening TrailData.txt for write failed");
+    }
+    for(i = 0; i < 100; i++)
+    {
+      myFile.print(data[i]+"\n");
+      data[i] = "";
+    }
+    myFile.close();
   }
-
-  if(speedCounter > 10000) //Will have to test how quicly speed counter increases
+}
+  if(speedCounter > 30) //If speedCounter is greater than 5 minutes
   {
+    Cellular.on();  //Turn on cellular module
     Cellular.connect(); //Manually connect to cellular
     while(!Cellular.ready()); //Wait for cellular connection to be established.
     if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT))
     {
       sd.errorHalt("opening TrailData.txt for read failed");
     }
-    String data;
+    int data;
     while((data = myFile.read()) >= 0)
     {
-      Particle.publish("Heat", data, PRIVATE);
+      //Particle.publish("Heat", data, PRIVATE);
+      Serial.println(data);
     }
     myFile.close();
     remove("TrailData.txt");
     speedCounter = 0;
-    //Put device into low power mode
+    System.sleep(SLEEP_MODE_SOFTPOWEROFF, 600); // Sleep for 10 minutes
   }
 
 }
