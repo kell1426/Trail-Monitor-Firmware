@@ -16,13 +16,14 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 File myFile;
 AssetTracker t = AssetTracker();
 int transmittingData = 1;
-long lastPublish = 0;
+long lastGPSpoint = 0;
 long lastSpeedCheck = 0;
 String data[50];
 int i = 0;
 int j = 0;
 bool writetime = false;
-int speedCounter = 0;
+String speed[50];
+//uint32_t initialTime = 0;
 
 void setup()
 {
@@ -34,39 +35,49 @@ void setup()
   }
 
   t.begin();	//Set up Asset Tracker bits
-  Cellular.off();
   t.gpsOn();	//Initialize GPS Module
-  delay(5000); //5 second delay
+  delay(5000); //10 second delay
   int timeout = 0;
-  while(!t.gpsFix())
+  // while(!t.gpsFix())
+  // {
+  //   delay(1000);
+  //   t.updateGPS();
+  //   timeout++;
+  //   if(timeout >= 120) //Allow 2 minutes to find a GPS signal
+  //   {
+  //     System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200); //Sleep for 20 minutes
+  //   }
+  // }
+  while(1)
   {
-    delay(1000);
-    t.updateGPS();
-    timeout++;
-    if(timeout >= 180) //Allow 2 minutes to find a GPS signal
+    t.updateGPS()
+    if(t.gpsFix())
     {
-      System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200); //Sleep for 20 minutes
+      break;
     }
   }
-  if(t.getSpeed() <= 2)
-  {
-    delay(30000); //Delayfor 30 seconds
-    t.updateGPS();
-    if(t.getSpeed() <= 2)
-    {
-      Delay(60000);  //Delay for 60 seconds
-      t.updateGPS();
-      if(t.getSpeed() <= 2)
-      {
-        System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200);  //Dead to us, Sleep for 20 minutes
-      }
-    }
-  }
-  // Cellular.on();
-  // Cellular.connect();
-  // while()
-  // Particle.connect();
-  //Particle.syncTime();  //May need to change timestamp to GPS based
+  //Could add in an acceleromer reading
+  // && (t.readXYZmagnitude() < 8500 && t.readXYZmagnitude() > 7000)
+  // if(t.getSpeed() <= 2)
+  // {
+  //   delay(30000); //Delayfor 30 seconds
+  //   t.updateGPS();
+  //   if(t.getSpeed() <= 2)
+  //   {
+  //     Delay(60000);  //Delay for 60 seconds
+  //     t.updateGPS();
+  //     if(t.getSpeed() <= 2)
+  //     {
+  //       System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200);  //Dead to us, Sleep for 20 minutes
+  //     }
+  //   }
+  // }
+  Cellular.on();
+  Cellular.connect();
+  while(!Cellular.ready());
+  Particle.connect();
+  Particle.syncTime();  //May need to change timestamp to GPS based
+  //initialTime = Time.local() * 1000;
 
   // Initialize SdFat or print a detailed error message and halt
   // Use half speed like the native library.
@@ -75,17 +86,14 @@ void setup()
   {
     sd.initErrorHalt();
   }
-  // if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
-  // {
-  //   sd.errorHalt("opening TrailData.txt for write failed");
-  // }
-  // myFile.close();
 
-  //Cellular.disconnect();
-
-  for (i = 0; i < 50; i++) {
+  for (i = 0; i < 50; i++)
+  {
     data[i]="";
   }
+  Particle.disconnect();
+  Cellular.disconnect();
+  Cellular.off();
 }
 
 void loop()
@@ -93,16 +101,18 @@ void loop()
 	t.updateGPS();
   int speedCounter;
   // if the current time - the last time we published is greater than your set delay...
-	if (millis()-lastPublish > (100)) //100ms SECOND DELAY
+	if (millis()-lastGPSpoint > (100)) //100ms SECOND DELAY
 	{
     // Remember when we published
-		lastPublish = millis();
+		lastGPSpoint = millis();
 
 		if(t.gpsFix())
 		{
 			float lat = t.readLatDeg();
 			float lon = t.readLonDeg();
-			uint32_t epoch = Time.local();
+			uint32_t epoch = Time.local(); //May be able to call Time.local() in setup and store (Time.local() * 1000) in a variable
+                                     //Then set eopch to variable + millis();
+      //uint32_t epoch = initialTime + millis();
 			int accel = t.readZ();
 			int harsh; //Look into which direction to use
 			if(accel < 12000)
@@ -150,7 +160,8 @@ void loop()
       //String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
       //Particle.publish("Test Data", test_data, PRIVATE);
       data[j] = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%lu\", \"Harsh\": \"%d\"}", lat, lon, epoch, harsh);
-	    j++;
+      speed[j] = "Speed is: " + String::format("%f", t.getSpeed());
+      j++;
       if(j == 50)
       {
         writetime = true;
@@ -158,51 +169,13 @@ void loop()
       }
 	   }
    }
- //Version 1. This one can be used if we want to attempt to send data while the vehicle is moving. Code not complete
- // if(Cellular.ready())
- //   {
-	// 	//Open File in read/write mode
-	// 	if (!myFile.open("TrailData.txt", O_RDWR))
-	// 	{
-	// 		sd.errorHalt("opening TrailData.txt for read failed");
-	// 	}
- //
-	// 	//Read data from SD card and delete it after the read
- //    int endOfFile = 0;
- //    /*String*/int data;
- //    while(Cellular.ready())
- //    {
- //      if((data = myFile.read()) >= 0)
- //      {
- //        endOfFile = 1;
- //        break;
- //      }
- //      Particle.publish("Heat", data, PRIVATE);
- //    }
- //    File myFile2;
- //    if (!myFile2.open("temp.txt", O_RDWR | O_CREAT | O_AT_END))
- //    {
- //      sd.errorHalt("opening temp.txt for write failed");
- //    }
- //    if(endOfFile == 0)
- //    {
- //      while((data = myFile.read()) >= 0)
- //      {
- //        myFile2.println(data)
- //      }
- //    }
- //    myFile.close();
- //    myFile2.close();
- //    remove("TrailData.txt");
- //    rename("temp.txt", "TrailData.txt");
- //
- //  }
 
   //Version 2. This one can be used if we want to send data while the vehicle has stopped for a while. Code not complete.
 if(writetime) //5 SECOND DELAY
 { // Check Speed, if slow increment counter
-  if(t.getSpeed() <= 2) //2 knots
+  if(/*t.getSpeed() <= 2 ||*/(t.readXYZmagnitude()) < 8500 && (t.readXYZmagnitude() > 7000)) //2 knots
   {
+    //We are not moving, data is invalid
     speedCounter++;
   }
   else
@@ -216,15 +189,17 @@ if(writetime) //5 SECOND DELAY
     }
     for(i = 0; i < 50; i++)
     {
-      myFile.print(data[i]+"\n");
+      myFile.println(data[i]);
+      myFile.println(speed[i]);
       data[i] = "";
     }
     myFile.close();
   }
+  writetime = false;
 }
   if(speedCounter > 60) //If speedCounter is greater than 5 minutes
   {
-    Cellular.on();  //Turn on cellular module
+    Cellular.on();
     Cellular.connect(); //Manually connect to cellular
     while(!Cellular.ready()); //Wait for cellular connection to be established.
     if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT))
@@ -232,6 +207,7 @@ if(writetime) //5 SECOND DELAY
       sd.errorHalt("opening TrailData.txt for read failed");
     }
     int data;
+    Particle.connect();
     while((data = myFile.read()) >= 0)
     {
       //Particle.publish("Heat", data, PRIVATE);
@@ -240,7 +216,45 @@ if(writetime) //5 SECOND DELAY
     myFile.close();
     remove("TrailData.txt");
     speedCounter = 0;
-    System.sleep(SLEEP_MODE_SOFTPOWEROFF, 600); // Sleep for 10 minutes
+    System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200); // Sleep for 20 minutes
   }
-
 }
+//Version 1. This one can be used if we want to attempt to send data while the vehicle is moving. Code not complete
+// if(Cellular.ready())
+//   {
+ // 	//Open File in read/write mode
+ // 	if (!myFile.open("TrailData.txt", O_RDWR))
+ // 	{
+ // 		sd.errorHalt("opening TrailData.txt for read failed");
+ // 	}
+//
+ // 	//Read data from SD card and delete it after the read
+//    int endOfFile = 0;
+//    /*String*/int data;
+//    while(Cellular.ready())
+//    {
+//      if((data = myFile.read()) >= 0)
+//      {
+//        endOfFile = 1;
+//        break;
+//      }
+//      Particle.publish("Heat", data, PRIVATE);
+//    }
+//    File myFile2;
+//    if (!myFile2.open("temp.txt", O_RDWR | O_CREAT | O_AT_END))
+//    {
+//      sd.errorHalt("opening temp.txt for write failed");
+//    }
+//    if(endOfFile == 0)
+//    {
+//      while((data = myFile.read()) >= 0)
+//      {
+//        myFile2.println(data)
+//      }
+//    }
+//    myFile.close();
+//    myFile2.close();
+//    remove("TrailData.txt");
+//    rename("temp.txt", "TrailData.txt");
+//
+//  }
