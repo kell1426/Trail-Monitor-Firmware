@@ -24,6 +24,7 @@ int j = 0;
 bool writetime = false;
 String speed[50];
 uint32_t initialTime = 0;
+int count = 0;
 
 void setup()
 {
@@ -37,7 +38,7 @@ void setup()
   t.begin();	//Set up Asset Tracker bits
   t.gpsOn();	//Initialize GPS Module
   delay(5000); //10 second delay
-  int timeout = 0;
+  //int timeout = 0;
   // while(!t.gpsFix())
   // {
   //   delay(1000);
@@ -78,6 +79,8 @@ void setup()
   Particle.connect();
   Particle.syncTime();  //May need to change timestamp to GPS based
   initialTime = Time.local() * 1000;
+  Serial.println(Time.local());
+  Serial.println(initialTime);
 
   // Initialize SdFat or print a detailed error message and halt
   // Use half speed like the native library.
@@ -98,8 +101,8 @@ void setup()
 
 void loop()
 {
-	t.updateGPS();
-  int speedCounter;
+  t.updateGPS();
+  //int speedCounter;
   // if the current time - the last time we published is greater than your set delay...
 	if (millis()-lastGPSpoint > (100)) //100ms SECOND DELAY
 	{
@@ -171,17 +174,17 @@ void loop()
    }
 
   //Version 2. This one can be used if we want to send data while the vehicle has stopped for a while. Code not complete.
-if(writetime) //5 SECOND DELAY
-{ // Check Speed, if slow increment counter
-  if(/*t.getSpeed() <= 2 ||*/(t.readXYZmagnitude()) < 8500 && (t.readXYZmagnitude() > 7000)) //2 knots
+ // Check Speed, if slow increment counter
+  if(/*t.getSpeed() <= 2 ||*/(t.readXYZmagnitude() < 8500) && (t.readXYZmagnitude() > 7000)) //2 knots
   {
-    //We are not moving, data is invalid
-    speedCounter++;
+    delay(5000);
+    count++;
+    Serial.println(count);
   }
-  else
+  if(writetime)
   {
     // Data is valid, write it
-    speedCounter = 0;
+    count = 0;
     int i;
     if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT | O_AT_END))
     {
@@ -194,10 +197,10 @@ if(writetime) //5 SECOND DELAY
       data[i] = "";
     }
     myFile.close();
+    writetime = false;
   }
-  writetime = false;
-}
-  if(speedCounter > 60) //If speedCounter is greater than 5 minutes
+
+  if(count >= 60) //If speedCounter is greater than 5 minutes
   {
     Cellular.on();
     Cellular.connect(); //Manually connect to cellular
@@ -211,11 +214,11 @@ if(writetime) //5 SECOND DELAY
     while((data = myFile.read()) >= 0)
     {
       //Particle.publish("Heat", data, PRIVATE);
-      Serial.println(data);
+      Serial.write(data);
     }
     myFile.close();
-    remove("TrailData.txt");
-    speedCounter = 0;
+    //remove("TrailData.txt");
+    count = 0;
     System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200); // Sleep for 20 minutes
   }
 }
