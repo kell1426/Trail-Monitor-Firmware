@@ -37,18 +37,28 @@ void setup()
   Cellular.off();
   t.gpsOn();	//Initialize GPS Module
   delay(5000); //5 second delay
-  t.updateGPS();
+  int timeout = 0;
+  while(!t.gpsFix())
+  {
+    delay(1000);
+    t.updateGPS();
+    timeout++;
+    if(timeout >= 180) //Allow 2 minutes to find a GPS signal
+    {
+      System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200); //Sleep for 20 minutes
+    }
+  }
   if(t.getSpeed() <= 2)
   {
-    System.sleep(30); //Sleep for 30 seconds
+    delay(30000); //Delayfor 30 seconds
     t.updateGPS();
     if(t.getSpeed() <= 2)
     {
-      System.sleep(60);  //Sleep for 60 seconds
+      Delay(60000);  //Delay for 60 seconds
       t.updateGPS();
       if(t.getSpeed() <= 2)
       {
-        System.sleep(SLEEP_MODE_SOFTPOWEROFF, 600);  //Dead to us, Sleep for 10 minutes
+        System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200);  //Dead to us, Sleep for 20 minutes
       }
     }
   }
@@ -56,7 +66,7 @@ void setup()
   // Cellular.connect();
   // while()
   // Particle.connect();
-  Particle.syncTime();  //May need to change timestamp to GPS based
+  //Particle.syncTime();  //May need to change timestamp to GPS based
 
   // Initialize SdFat or print a detailed error message and halt
   // Use half speed like the native library.
