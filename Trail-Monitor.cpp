@@ -41,9 +41,11 @@ void setup()
   if(t.getSpeed() <= 2)
   {
     System.sleep(30); //Sleep for 30 seconds
+    t.updateGPS();
     if(t.getSpeed() <= 2)
     {
       System.sleep(60);  //Sleep for 60 seconds
+      t.updateGPS();
       if(t.getSpeed() <= 2)
       {
         System.sleep(SLEEP_MODE_SOFTPOWEROFF, 600);  //Dead to us, Sleep for 10 minutes
