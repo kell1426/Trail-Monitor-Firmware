@@ -22,7 +22,7 @@ String data[50];
 int i = 0;
 int j = 0;
 bool writetime = false;
-String speed[50];
+//String speed[50];
 uint32_t initialTime = 0;
 int count = 0;
 
@@ -162,8 +162,8 @@ void loop()
 	   //   Particle.publish("Time", epochs, PRIVATE);
       //String test_data = String::format("Lat: %f, Lon: %f, Time: %lu, Harsh: %d", lat, lon, epoch, harsh);
       //Particle.publish("Test Data", test_data, PRIVATE);
-      data[j] = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%lu\", \"Harsh\": \"%d\"}", lat, lon, epoch, harsh);
-      speed[j] = "Speed is: " + String::format("%f", t.getSpeed());
+      data[j] = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%lu\", \"Harsh\": \"%d\" }", lat, lon, epoch, harsh);
+      //speed[j] = "Speed is: " + String::format("%f", t.getSpeed());
       j++;
       if(j == 50)
       {
@@ -193,30 +193,43 @@ void loop()
     for(i = 0; i < 50; i++)
     {
       myFile.println(data[i]);
-      myFile.println(speed[i]);
+      //myFile.println(speed[i]);
       data[i] = "";
     }
     myFile.close();
     writetime = false;
   }
 
-  if(count >= 60) //If speedCounter is greater than 5 minutes
+  if(count >= 6) //If speedCounter is greater than 5 minutes (60)
   {
     Cellular.on();
     Cellular.connect(); //Manually connect to cellular
     while(!Cellular.ready()); //Wait for cellular connection to be established.
-    if (!myFile.open("TrailData.txt", O_RDWR | O_CREAT))
+    Particle.connect();
+    if (!myFile.open("TrailData.txt", O_RDWR))
     {
       sd.errorHalt("opening TrailData.txt for read failed");
     }
-    int data;
-    Particle.connect();
-    while((data = myFile.read()) >= 0)
+    char arr[256];
+    size_t n;
+    while((n = myFile.fgets(arr, sizeof(arr))) > 0)
     {
-      //Particle.publish("Heat", data, PRIVATE);
-      Serial.write(data);
+        String str(arr);
+        Serial.println(str);
+         //   //Particle.publish("Heat", data, PRIVATE);
     }
     myFile.close();
+    // String data;
+    // Particle.connect();
+    // std::ifstream ifs;
+    // ifs.open("TrailData.txt");
+    // while(!ifs.eof())
+    // {
+    //   std::getline(ifs, data);
+    //   //Particle.publish("Heat", data, PRIVATE);
+    //   Serial.write(data);
+    // }
+    // ifs.close();
     //remove("TrailData.txt");
     count = 0;
     System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200); // Sleep for 20 minutes
