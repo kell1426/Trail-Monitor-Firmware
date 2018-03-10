@@ -54,11 +54,14 @@ void setup()
   Cellular.connect();
   while(!Cellular.ready());
   Particle.connect();
-  while(!Time.isValid())
-  {
-      Particle.syncTime();
-  }
-  initialTime = Time.local();
+//   while(!Particle.connected());
+//   Time.zone(-6);
+//   Particle.syncTime();
+//   while(Particle.syncTimePending());
+//   if(Time.isValid())
+//   {
+    initialTime = Time.local();
+  //}
   Particle.disconnect();
   Cellular.disconnect();
   Cellular.off();
@@ -106,15 +109,10 @@ void loop()
         if(mag > 7000 && mag < 8500 /*&& speed < 5*/)
         {
           movementCounter++;
-          // String info = String::format("MovementCounter is: %d and XYZmag is: %d", movementCounter, mag);
-          // Serial.println(info);
-
         }
         else
         {
           movementCounter = 0;
-          // String info = String::format("MovementCounter is: %d and XYZmag is: %d", movementCounter, mag);
-          // Serial.println(info);
           if(t.gpsFix())
           {
             float lat = t.readLatDeg();
