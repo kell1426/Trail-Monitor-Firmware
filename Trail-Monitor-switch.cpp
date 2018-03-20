@@ -22,6 +22,7 @@ File myFile;
 AssetTracker t = AssetTracker();
 long lastGPSpoint = 0;
 uint32_t initialTime = 0;
+uint32_t offset = 0;
 int count = 0;
 enum State { WAKE_STATE, ACQUIRE_STATE, SEND_STATE, POWER_DOWN_STATE};
 State state = WAKE_STATE;
@@ -54,14 +55,9 @@ void setup()
   Cellular.connect();
   while(!Cellular.ready());
   Particle.connect();
-//   while(!Particle.connected());
-//   Time.zone(-6);
-//   Particle.syncTime();
-//   while(Particle.syncTimePending());
-//   if(Time.isValid())
-//   {
-    initialTime = Time.local();
-  //}
+  delay(5000);
+  initialTime = Time.local();
+  offset = millis();
   Particle.disconnect();
   Cellular.disconnect();
   Cellular.off();
@@ -117,10 +113,10 @@ void loop()
           {
             float lat = t.readLatDeg();
             float lon = t.readLonDeg();
-            uint32_t epoch = initialTime + (millis() / 1000);
-            //int ms = millis() % 1000;
-            //String stamp = String::format("%lu%d", epoch, ms);
-            String stamp = String::format("%lu", epoch);
+            uint32_t epoch = initialTime + ((millis() - offset) / 1000);
+            uint32_t ms = millis() % 1000;
+            String stamp = String::format("%lu%lu", epoch, ms);
+            //String stamp = String::format("%lu", epoch);
             int accel = t.readZ();
             String data = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%s\", \"Harsh\": \"%d\" }", lat, lon, stamp.c_str(), accel);
             myFile.open("TrailData.txt", O_RDWR | O_AT_END);
