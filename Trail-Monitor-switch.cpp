@@ -15,7 +15,7 @@ const uint8_t chipSelect = D5;
 #endif  // SPI_CONFIGURATION
 //------------------------------------------------------------------------------
 #define WAKE_DELAY 12000  //10 ms * 12000 = 2 minute delay
-#define MOVEMENT_DELAY 60 //500 ms * 600 = 5 minute delay  500 * 60 = 30 second delay
+#define MOVEMENT_DELAY 30 //1000 ms * 300 = 5 minute delay  1000 * 30 = 30 second delay
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
 File myFile;
@@ -95,7 +95,7 @@ void loop()
       {
         state = SEND_STATE;
       }
-      else if ((millis()-lastGPSpoint) > (500)) //500ms SECOND DELAY
+      else if ((millis()-lastGPSpoint) > (1000)) //1000ms SECOND DELAY
       {
         // Remember when we published
     		lastGPSpoint = millis();
@@ -118,7 +118,7 @@ void loop()
             String stamp = String::format("%lu%lu", epoch, ms);
             //String stamp = String::format("%lu", epoch);
             int accel = t.readZ();
-            String data = String::format("{ \"Lat\": \"%f\", \"Lon\": \"%f\", \"Time\": \"%s\", \"Harsh\": \"%d\" }", lat, lon, stamp.c_str(), accel);
+            String data = String::format("{ \"La\": \"%f\", \"Lo\": \"%f\", \"T\": \"%s\", \"H\": \"%d\" }", lat, lon, stamp.c_str(), accel);
             myFile.open("TrailData.txt", O_RDWR | O_AT_END);
             myFile.println(data);
             myFile.close();
@@ -139,6 +139,7 @@ void loop()
           String str(arr);
           Serial.println(str);
           //Particle.publish("Heat", str, PRIVATE);
+          //delay(1000);
       }
       myFile.close();
       //remove("TrailData.txt");
@@ -146,6 +147,10 @@ void loop()
       break;
     case POWER_DOWN_STATE:
       System.sleep(SLEEP_MODE_SOFTPOWEROFF, 1200);
+      //System.sleep(wakeUpPin, edgeTriggerMode)
+      //Wake up on triggered pin, will have a voltage running from
+      //voltage regulator to a pin on the electron. Will wake up when
+      //vehicle is turned on
       break;
   }
 }
