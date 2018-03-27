@@ -25,18 +25,19 @@ uint32_t offset = 0;
 enum State { WAKE_STATE, ACQUIRE_STATE, SEND_STATE, POWER_DOWN_STATE};
 State state = WAKE_STATE;
 int pin;
-int count = 0;
-long lastGPSpoint = 0;
 
 void sendStateChange();
 
 void setup()
 {
-  Serial.begin(9600);
-  // Wait for USB Serial
-  while (!Serial)
+  if(DEBUG == 1)
   {
-  SysCall::yield();
+      Serial.begin(9600);
+      // Wait for USB Serial
+      while (!Serial)
+      {
+      SysCall::yield();
+      }
   }
 
   if (!sd.begin(chipSelect, SPI_HALF_SPEED))
@@ -60,12 +61,16 @@ void loop()
   switch(state)
   {
     case WAKE_STATE:
-    Serial.println("In WAKE_STATE");
+      myFile.open("TrailData.txt", O_RDWR | O_CREAT);
+      myFile.close();
       t.gpsOn();
       if(DEBUG == 1)
       {
+        Serial.println("In WAKE_STATE");
         state = ACQUIRE_STATE;
+        delay(500);
         Serial.println("Moving to ACQUIRE_STATE");
+        delay(500);
         break;
       }
       Cellular.on();
@@ -84,6 +89,11 @@ void loop()
       //Serial.println("In ACQUIRE_STATE");
       //delay(1000);
       t.updateGPS();
+      if(DEBUG == 1)
+      {
+        Serial.println("In ACQUIRE_STATE");
+        delay(500);
+      }
       if ((millis()-lastGPSpoint) > (1000))
       {
         lastGPSpoint = millis();
@@ -95,7 +105,7 @@ void loop()
           uint32_t ms = millis() % 1000;
           String stamp = String::format("%lu%lu", epoch, ms);
           int accel = t.readZ();
-          String data = String::format("{ \"La\": \"%f\", \"Lo\": \"%f\", \"T\": \"%s\", \"H\": \"%d\", \"id\": \"%d\" }", lat, lon, stamp.c_str(), accel, id);
+          String data = String::format("{ \"La\": %f, \"Lo\": %f, \"T\": \"%s\", \"H\": %d, \"id\": %d }", lat, lon, stamp.c_str(), accel, id);
           myFile.open("TrailData.txt", O_RDWR | O_AT_END);
           myFile.println(data);
           myFile.close();
@@ -103,13 +113,14 @@ void loop()
       }
       break;
     case SEND_STATE:
-    Serial.println("In SEND_STATE");
       t.gpsOff();
       if(DEBUG == 1)
       {
+        Serial.println("In SEND_STATE");
         state = POWER_DOWN_STATE;
-        delay(1000);
+        delay(500);
         Serial.println("Moving to POWER_DOWN_STATE");
+        delay(500);
         break;
       }
       Cellular.on();
@@ -122,24 +133,26 @@ void loop()
       while((n = myFile.fgets(arr, sizeof(arr))) > 0)
       {
           String str(arr);
-          Serial.println(str);
-          //Particle.publish("Heat", str, PRIVATE);
-          //delay(1500);
+          Particle.publish("Heat", str, PRIVATE);
+          delay(1500);
       }
-      myFile.close();
-      //remove("TrailData.txt");
+      myFile.remove();
       state = POWER_DOWN_STATE;
       break;
     case POWER_DOWN_STATE:
-      Serial.println("In POWER_DOWN_STATE");
+      if(DEBUG == 1)
+      {
+        Serial.println("In POWER_DOWN_STATE");
+      }
       delay(1000);
       System.sleep(D1, RISING);
       delay(1000);
       state = WAKE_STATE;
-      Serial.println("Moving to WAKE_STATE");
-      //Wake up on triggered pin, will have a voltage running from
-      //voltage regulator to a pin on the electron. Will wake up when
-      //vehicle is turned on
+      if(DEBUG == 1)
+      {
+        Serial.println("Moving to WAKE_STATE");
+      }
+      delay(500);
       break;
   }
 }
