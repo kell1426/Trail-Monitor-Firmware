@@ -49,6 +49,13 @@ void setup()
 
   myFile.open("TrailData.txt", O_RDWR | O_CREAT);
   myFile.close();
+    if(DEBUG == 2)
+    {
+        IMUfile.open("IMUData.txt", O_RDWR | O_CREAT);
+        IMUfile.close();
+        SpeedFile.open("Speeddata.txt", O_RDWR | O_CREAT);
+        SpeedFile.close();
+    }
 
   t.begin();	//Set up Asset Tracker bits
 
@@ -167,7 +174,7 @@ void loop()
       {
           String str(arr);
           Particle.publish("Heat", str, PRIVATE);
-          delay(1500);
+          delay(3000);
       }
       myFile.remove();
       state = POWER_DOWN_STATE;
