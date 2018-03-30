@@ -18,6 +18,8 @@ const uint8_t chipSelect = D5;
 SYSTEM_MODE(SEMI_AUTOMATIC);
 int id = 100;
 File myFile;
+File IMUfile;
+File SpeedFile;
 AssetTracker t = AssetTracker();
 long lastGPSpoint = 0;
 uint32_t initialTime = 0;
@@ -63,7 +65,15 @@ void loop()
     case WAKE_STATE:
       myFile.open("TrailData.txt", O_RDWR | O_CREAT);
       myFile.close();
+      if(DEBUG == 2)
+      {
+        IMUfile.open("IMUData.txt", O_RDWR | O_CREAT);
+        IMUfile.close();
+        SpeedFile.open("Speeddata.txt", O_RDWR | O_CREAT);
+        SpeedFile.close();
+      }
       t.gpsOn();
+      //t.antennaExternal();
       if(DEBUG == 1)
       {
         Serial.println("In WAKE_STATE");
@@ -77,7 +87,8 @@ void loop()
       Cellular.connect();
       while(!Cellular.ready());
       Particle.connect();
-      delay(5000);
+      Particle.syncTime();
+      delay(10000);
       initialTime = Time.local();
       offset = millis();
       Particle.disconnect();
@@ -86,8 +97,6 @@ void loop()
       state = ACQUIRE_STATE;
       break;
     case ACQUIRE_STATE:
-      //Serial.println("In ACQUIRE_STATE");
-      //delay(1000);
       t.updateGPS();
       if(DEBUG == 1)
       {
@@ -99,6 +108,19 @@ void loop()
         lastGPSpoint = millis();
         if(t.gpsFix())
         {
+          int x;
+          int y;
+          int z;
+          int mag;
+          float speed;
+          if(DEBUG == 2)
+          {
+            x = t.readX();
+            y = t.readY();
+            z = t.readZ();
+            mag = t.readXYZmagnitude();
+            speed = t.getSpeed();
+          }
           float lat = t.readLatDeg();
           float lon = t.readLonDeg();
           uint32_t epoch = initialTime + ((millis() - offset) / 1000);
@@ -109,6 +131,17 @@ void loop()
           myFile.open("TrailData.txt", O_RDWR | O_AT_END);
           myFile.println(data);
           myFile.close();
+          if(DEBUG == 2)
+          {
+            String IMUstring = String::format("X is: %d, Y is: %d, Z is: %d, Mag is: %d", x, y, z, mag);
+            String speedString = String::format("Speed is: %f at time: %s", speed, stamp.c_str());
+            IMUfile.open("IMUdata.txt", O_RDWR | O_AT_END);
+            IMUfile.println(IMUstring);
+            IMUfile.close();
+            SpeedFile.open("Speeddata.txt", O_RDWR | O_AT_END);
+            SpeedFile.println(speedString);
+            SpeedFile.close();
+          }
         }
       }
       break;
