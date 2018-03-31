@@ -29,6 +29,7 @@ State state = WAKE_STATE;
 int pin;
 
 void sendStateChange();
+String ms_last3digit_grabber(int ms)
 
 void setup()
 {
@@ -120,19 +121,24 @@ void loop()
           int z;
           int mag;
           float speed;
+          speed = t.getSpeed();
+          if(speed < 2.0) //Vehicle not in motion
+          {
+            break;
+          }
           if(DEBUG == 2)
           {
             x = t.readX();
             y = t.readY();
             z = t.readZ();
             mag = t.readXYZmagnitude();
-            speed = t.getSpeed();
           }
           float lat = t.readLatDeg();
           float lon = t.readLonDeg();
           uint32_t epoch = initialTime + ((millis() - offset) / 1000);
           uint32_t ms = millis() % 1000;
-          String stamp = String::format("%lu%lu", epoch, ms);
+          String ms_string = ms_last3digit_grabber(ms);
+          String stamp = String::format("%lu%s", epoch, ms_string.c_str());
           int accel = t.readZ();
           String data = String::format("{ \"La\": %f, \"Lo\": %f, \"T\": \"%s\", \"H\": %d, \"id\": %d }", lat, lon, stamp.c_str(), accel, id);
           myFile.open("TrailData.txt", O_RDWR | O_AT_END);
@@ -201,4 +207,22 @@ void sendStateChange()
 {
     state = SEND_STATE;
     Serial.println("Moving to SEND_STATE");
+}
+
+String ms_last3digit_grabber(int ms)
+{
+  String digits;
+  if(ms >= 0 && ms <= 9)
+  {
+    digits = String::format("00%d", ms);
+  }
+  else if(ms >= 10 && ms <= 99)
+  {
+    digits = String::format("0%d", ms);
+  }
+  else
+  {
+    digits = String::format("%d", ms);
+  }
+  return digits;
 }
