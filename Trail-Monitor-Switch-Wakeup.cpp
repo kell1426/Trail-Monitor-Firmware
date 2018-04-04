@@ -15,9 +15,11 @@ const uint8_t chipSelect = D5;
 #endif  // SPI_CONFIGURATION
 //------------------------------------------------------------------------------
 #define DEBUG 0
+int WKPIN = D1;
 SYSTEM_MODE(SEMI_AUTOMATIC);
 int id = 100;
 File myFile;
+File exFile;
 File IMUfile;
 File SpeedFile;
 AssetTracker t = AssetTracker();
@@ -60,9 +62,9 @@ void setup()
 
   t.begin();	//Set up Asset Tracker bits
 
-  pinMode(D1, INPUT_PULLDOWN);
+  pinMode(WKPIN, INPUT_PULLDOWN);
 
-  attachInterrupt(D1, sendStateChange, FALLING);
+  attachInterrupt(WKPIN, sendStateChange, FALLING);
   delay(5000);
 }
 
@@ -176,14 +178,60 @@ void loop()
       myFile.open("TrailData.txt", O_RDWR);
       char arr[256];
       size_t n;
+      int skip = 0;
+      int alive = 0;
+
+      // Read and publish TrailData.txt data
       while((n = myFile.fgets(arr, sizeof(arr))) > 0)
       {
+        if (digitalRead(WKPIN)) { //Check if Vehicle is turned back on
+          delay(1000); // Wait and make sure
+          if (digitalRead(WKPIN)) {
+            exFile.open("TrailDataExtras.txt", O_RDWR | O_AT_END);
+            exFile.println(str(arr));
+            while ((n = myFile.fgets(arr, sizeof(arr))) > 0) {
+              exFile.println(str(arr));
+            }
+            skip = 1;
+            alive = 1;
+            break;
+          }
+        }
           String str(arr);
           Particle.publish("Heat", str, PRIVATE);
           delay(3000);
       }
       myFile.remove();
-      state = POWER_DOWN_STATE;
+
+      // Read and publish TrailDataExtras.txt data
+      if (skip == 0) {
+        exFile.open("TrailDataExtras.txt", O_RDWR);
+        while((n = exFile.fgets(arr, sizeof(arr))) > 0)
+        {
+          if (digitalRead(WKPIN)) { //Check if Vehicle is turned back on
+            delay(1000); // Wait and make sure
+            if (digitalRead(WKPIN)) {
+              myFile.open("TrailData.txt", O_RDWR | O_AT_END);
+              myFile.println(str(arr));
+              while ((n = exFile.fgets(arr, sizeof(arr))) > 0) {
+                myFile.println(str(arr));
+              }
+              alive = 1;
+              break;
+            }
+          }
+            String str(arr);
+            Particle.publish("Heat", str, PRIVATE);
+            delay(3000);
+        }
+        exFile.remove();
+      }
+      if (alive) {
+        state = ACQUIRE_STATE;
+      }
+      else {
+        state = POWER_DOWN_STATE;
+      }
       break;
     case POWER_DOWN_STATE:
       if(DEBUG == 1)
@@ -191,7 +239,7 @@ void loop()
         Serial.println("In POWER_DOWN_STATE");
       }
       delay(1000);
-      System.sleep(D1, RISING);
+      System.sleep(WKPIN, RISING);
       delay(1000);
       state = WAKE_STATE;
       if(DEBUG == 1)
