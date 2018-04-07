@@ -6,6 +6,8 @@
 
 #include <math.h>
 #include <time.h>
+
+
 // Pick an SPI configuration.
 // See SPI configuration section below (comments are for photon).
 #define SPI_CONFIGURATION 0
@@ -17,6 +19,9 @@ const uint8_t chipSelect = D5;
 #endif  // SPI_CONFIGURATION
 //------------------------------------------------------------------------------
 #define DEBUG 0
+#define range 4 //range attribute on particle, for filtering not setup
+#define SpeedFactor 1
+#define SuspensionFactor 0.5
 int WKPIN = D1;
 SYSTEM_MODE(SEMI_AUTOMATIC);
 File myFile;
@@ -34,19 +39,31 @@ float avgSumSQ = 0;
 int mag;
 int skip = 0;
 int alive = 0;
-//uint32_t initialTime = 0;
-//uint32_t offset = 0;
+float lastLat;
+float lastLon;
 enum State { WAKE_STATE, ACQUIRE_STATE, SEND_STATE, POWER_DOWN_STATE};
 State state = WAKE_STATE;
 int pin;
 
+//initialization for Filtering
+float oldAccel = 0;
+
+float filterCoefficient = 0.9; //lowpass
+float lowpassValue = 0;
+float highpassValue = 0;
+
+int noisefig = 1;
+int filteredMag = 0;
+//end initialization for filtering
 void sendStateChange();
 String ms_last3digit_grabber(int ms);
 uint32_t gpsTIme();
+float convert(float raw);
+float filter(float magnitude);
 
 void setup()
 {
-  if(DEBUG == 1)
+  if(DEBUG == 1 || DEBUG == 3)
   {
       Serial.begin(9600);
       // Wait for USB Serial
@@ -63,7 +80,7 @@ void setup()
 
   myFile.open("TrailData.txt", O_RDWR | O_CREAT);
   myFile.close();
-    if(DEBUG == 2)
+    if(DEBUG == 2 || DEBUG == 3)
     {
         IMUfile.open("IMUData.txt", O_RDWR | O_CREAT);
         IMUfile.close();
@@ -94,7 +111,7 @@ void loop()
         SpeedFile.close();
       }
       t.gpsOn();
-      //t.antennaExternal();
+      t.antennaExternal();
       if(DEBUG == 1)
       {
         Serial.println("In WAKE_STATE");
@@ -104,17 +121,6 @@ void loop()
         delay(500);
         break;
       }
-      // Cellular.on();
-      // Cellular.connect();
-      // while(!Cellular.ready());
-      // Particle.connect();
-      // Particle.syncTime();
-      // delay(10000);
-      // initialTime = Time.local();
-      // offset = millis();
-      // Particle.disconnect();
-      // Cellular.disconnect();
-      // Cellular.off();
       state = ACQUIRE_STATE;
       break;
     case ACQUIRE_STATE:
@@ -136,6 +142,18 @@ void loop()
           avgSumSQ = curSumSQ/numAcc;
         }
 
+        if ((millis()-lastACCpoint) > (10)) // Accelerometer every 10ms
+        {
+          lastACCpoint = millis();
+          mag = t.readXYZmagnitude();
+          filteredMag = round(convert(filter(mag))) * SpeedFactor * SuspensionFactor; //filter magnitude, convert to m/s^2
+          if(filteredMag > 0)
+          {
+            numACCpoints++;
+          }
+          sumsq = sumsq + (filteredMag*filteredMag);
+        }
+
         if(t.gpsFix())
         {
           int x;
@@ -143,10 +161,10 @@ void loop()
           int z;
           float speed;
           speed = t.getSpeed();
-          if(speed < 2.0) //Vehicle not in motion
-          {
-            break;
-          }
+          // if(speed < 2.0) //Vehicle not in motion
+          // {
+          //   break;
+          // }
           if(DEBUG == 2)
           {
             x = t.readX();
@@ -156,10 +174,14 @@ void loop()
           }
           float lat = t.readLatDeg();
           float lon = t.readLonDeg();
+          if((lastLat == lat) && (lastLon = lon))
+          {
+              break;
+          }
           //uint32_t epoch = initialTime + ((millis() - offset) / 1000);
           uint32_t epoch = gpsTime();
           //uint32_t ms = millis() % 1000;
-          uint32_t ms = t.getMilliseconds();
+          uint32_t ms = millis() % 1000;
           String ms_string = ms_last3digit_grabber(ms);
           String stamp = String::format("%lu%s", epoch, ms_string.c_str());
           int accel = sqrt(avgSumSQ);
@@ -171,21 +193,16 @@ void loop()
           {
             String IMUstring = String::format("X is: %d, Y is: %d, Z is: %d, Mag is: %d", x, y, z, mag);
             String speedString = String::format("Speed is: %f at time: %s", speed, stamp.c_str());
-            IMUfile.open("IMUdata.txt", O_RDWR | O_AT_END);
+            IMUfile.open("IMUData.txt", O_RDWR | O_AT_END);
             IMUfile.println(IMUstring);
             IMUfile.close();
             SpeedFile.open("Speeddata.txt", O_RDWR | O_AT_END);
             SpeedFile.println(speedString);
             SpeedFile.close();
           }
+          lastLat = lat;
+          lastLon = lon;
         }
-      }
-      if ((millis()-lastACCpoint) > (10)) // Accelerometer every 10ms
-      {
-        lastACCpoint = millis();
-        mag = t.readXYZmagnitude();
-        numACCpoints++;
-        sumsq += mag*mag;
       }
       break;
     case SEND_STATE:
@@ -254,14 +271,20 @@ void loop()
           }
             String str(arr);
             Particle.publish("Heat", str, PRIVATE);
-            delay(3000);
+            delay(1000);
         }
         exFile.remove();
       }
       if (alive) {
+        Particle.disconnect();
+        Cellular.disconnect();
+        Cellular.off();
         state = ACQUIRE_STATE;
       }
       else {
+        Particle.disconnect();
+        Cellular.disconnect();
+        Cellular.off();
         state = POWER_DOWN_STATE;
       }
       break;
@@ -315,7 +338,7 @@ uint32_t gpsTime()
       struct tm T;
       time_t t_of_day;
 
-      T.tm_year = t.getYear()-1900;
+      T.tm_year = t.getYear() + 100;
       T.tm_mon = t.getMonth() - 1;     // Month, 0 - jan
       T.tm_mday = t.getDay();          // Day of the month
       T.tm_hour = t.getHour();
@@ -327,4 +350,42 @@ uint32_t gpsTime()
       //printf("seconds since the Epoch: %ld\n", (long) t_of_day);
       uint32_t timestamp = (uint32_t)t_of_day;
       return timestamp;
+}
+
+//Filtering for roughness
+int filter(int magnitude) {
+
+	float t = (1 - filterCoefficient) / filterCoefficient;
+
+
+	// Triple Exponential Moving Average low pass filter: a little lag
+	lowpassValue = lowpassValue * filterCoefficient + magnitude * (1 - filterCoefficient);
+	lowpassValue = lowpassValue * filterCoefficient + magnitude * (1 - filterCoefficient);
+	lowpassValue = lowpassValue * filterCoefficient + magnitude * (1 - filterCoefficient);
+
+	// Zero lag Exponential Moving Average low pass filter: less lag but a little value change
+	//lowpassValue = (1 - filterCoefficient)*magnitude + filterCoefficient*(magnitude + (magnitude - mg[t]));
+
+	// high pass filter
+	highpassValue = magnitude - lowpassValue;
+
+
+	oldAccel = highpassValue;
+
+	if (noisefig == 1) { //the first value is a noise
+		noisefig = 0;
+		highpassValue = 0;
+	}
+
+	return abs(highpassValue);
+}
+
+//Convert from raw IMU to m/s^2
+float convert(int raw) {
+
+	float a = 0;
+
+	a = ((float)raw / (float)32767) * (float)range * 9.8;
+
+	return a;
 }
