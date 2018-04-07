@@ -45,6 +45,11 @@ enum State { WAKE_STATE, ACQUIRE_STATE, SEND_STATE, POWER_DOWN_STATE};
 State state = WAKE_STATE;
 int pin;
 
+String data1;
+String data2;
+String data3;
+int count = 0;
+
 //initialization for Filtering
 float oldAccel = 0;
 
@@ -185,10 +190,26 @@ void loop()
           String ms_string = ms_last3digit_grabber(ms);
           String stamp = String::format("%lu%s", epoch, ms_string.c_str());
           int accel = sqrt(avgSumSQ);
-          String data = String::format("{ \"La\": %f, \"Lo\": %f, \"T\": \"%s\", \"H\": %d }", lat, lon, stamp.c_str(), accel);
-          myFile.open("TrailData.txt", O_RDWR | O_AT_END);
-          myFile.println(data);
-          myFile.close();
+          if(count == 0)
+          {
+            data1 = String::format("{ \"La1\": %f, \"Lo1\": %f, \"T1\": \"%s\", \"H1\": %d, ", lat, lon, stamp.c_str(), accel);
+            count++;
+          }
+          else if(count == 1)
+          {
+            data2 = String::format("\"La2\": %f, \"Lo2\": %f, \"T2\": \"%s\", \"H2\": %d, ", lat, lon, stamp.c_str(), accel);
+            count++;
+          }
+          else
+          {
+            data3 = String::format("\"La3\": %f, \"Lo3\": %f, \"T3\": \"%s\", \"H3\": %d }", lat, lon, stamp.c_str(), accel);
+            count = 0;
+            String allData = String::format("%s, %s, %s", data1.c_str(), data2.c_str(), data3.c_str());
+            myFile.open("TrailData.txt", O_RDWR | O_AT_END);
+            myFile.println(allData);
+            myFile.close();
+          }
+
           if(DEBUG == 2)
           {
             String IMUstring = String::format("X is: %d, Y is: %d, Z is: %d, Mag is: %d", x, y, z, mag);
@@ -220,7 +241,7 @@ void loop()
       Cellular.connect();
       while(!Cellular.ready());
       Particle.connect();
-      myFile.open("TrailData.txt", O_RDWR);
+      myFile.open("TrailData.txt", O_RDWR | O_CREAT);
       char arr[256];
       size_t n;
       skip = 0;
@@ -234,19 +255,20 @@ void loop()
           if (digitalRead(WKPIN) == HIGH) {
             exFile.open("TrailDataExtras.txt", O_RDWR | O_AT_END | O_CREAT);
             String str(arr);
-            exFile.println(str);
+            exFile.print(str);
             while ((n = myFile.fgets(arr, sizeof(arr))) > 0) { // Move lines from TrailData to Extras
               String str(arr);
-              exFile.println(str);
+              exFile.print(str);
             }
             skip = 1;
             alive = 1;
+            exFile.close();
             break;
           }
         }
           String str(arr);
           Particle.publish("Heat", str, PRIVATE);
-          delay(3000);
+          delay(1500);
       }
       myFile.remove();
 
@@ -260,18 +282,19 @@ void loop()
             if (digitalRead(WKPIN) == HIGH) {
               myFile.open("TrailData.txt", O_RDWR | O_AT_END | O_CREAT);
               String str(arr);
-              myFile.println(str);
+              myFile.print(str);
               while ((n = exFile.fgets(arr, sizeof(arr))) > 0) { // Move lines from Extras to TrailData
                 String str(arr);
-                myFile.println(str);
+                myFile.print(str);
               }
+              myFile.close();
               alive = 1;
               break;
             }
           }
             String str(arr);
             Particle.publish("Heat", str, PRIVATE);
-            delay(1000);
+            delay(1500);
         }
         exFile.remove();
       }
