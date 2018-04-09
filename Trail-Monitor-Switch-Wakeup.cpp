@@ -204,7 +204,7 @@ void loop()
           {
             data3 = String::format("\"La3\": %f, \"Lo3\": %f, \"T3\": \"%s\", \"H3\": %d }", lat, lon, stamp.c_str(), accel);
             count = 0;
-            String allData = String::format("%s, %s, %s", data1.c_str(), data2.c_str(), data3.c_str());
+            String allData = String::format("%s%s%s", data1.c_str(), data2.c_str(), data3.c_str());
             myFile.open("TrailData.txt", O_RDWR | O_AT_END);
             myFile.println(allData);
             myFile.close();
