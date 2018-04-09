@@ -116,7 +116,7 @@ void loop()
         SpeedFile.close();
       }
       t.gpsOn();
-      t.antennaExternal();
+      //t.antennaExternal();
       if(DEBUG == 1)
       {
         Serial.println("In WAKE_STATE");
