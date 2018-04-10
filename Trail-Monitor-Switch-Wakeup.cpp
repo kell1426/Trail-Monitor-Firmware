@@ -116,7 +116,7 @@ void loop()
         SpeedFile.close();
       }
       t.gpsOn();
-      //t.antennaExternal();
+      t.antennaExternal();
       if(DEBUG == 1)
       {
         Serial.println("In WAKE_STATE");
@@ -166,10 +166,10 @@ void loop()
           int z;
           float speed;
           speed = t.getSpeed();
-          // if(speed < 2.0) //Vehicle not in motion
-          // {
-          //   break;
-          // }
+          if(speed < 0.8) //Vehicle not in motion
+          {
+            break;
+          }
           if(DEBUG == 2)
           {
             x = t.readX();
