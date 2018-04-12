@@ -21,7 +21,7 @@ const uint8_t chipSelect = D5;
 #define DEBUG 0
 #define range 4 //range attribute on particle, for filtering not setup
 #define SpeedFactor 1
-#define SuspensionFactor 0.5
+#define SuspensionFactor 2
 int WKPIN = D1;
 SYSTEM_MODE(SEMI_AUTOMATIC);
 File myFile;
@@ -85,7 +85,7 @@ void setup()
 
   myFile.open("TrailData.txt", O_RDWR | O_CREAT);
   myFile.close();
-    if(DEBUG == 2 || DEBUG == 3)
+    if(DEBUG == 2 || DEBUG == 3 || DEBUG == 5)
     {
         IMUfile.open("IMUData.txt", O_RDWR | O_CREAT);
         IMUfile.close();
@@ -135,6 +135,24 @@ void loop()
         Serial.println("In ACQUIRE_STATE");
         delay(500);
       }
+        if ((millis()-lastACCpoint) > (10)) // Accelerometer every 10ms
+        {
+          lastACCpoint = millis();
+          mag = t.readXYZmagnitude();
+          if(DEBUG == 5)
+          {
+            String IMUstring = String::format("Raw Mag is: %d", mag);
+            IMUfile.open("IMUData.txt", O_RDWR | O_AT_END);
+            IMUfile.println(IMUstring);
+            IMUfile.close();
+          }
+          filteredMag = round(convert(filter(mag))) * SpeedFactor * SuspensionFactor; //filter magnitude, convert to m/s^2
+          if(filteredMag > 0)
+          {
+            numACCpoints++;
+          }
+          sumsq = sumsq + (filteredMag*filteredMag);
+        }
       if ((millis()-lastGPSpoint) > (1000))
       {
         lastGPSpoint = millis();
@@ -146,19 +164,6 @@ void loop()
         if (numAcc>0) {
           avgSumSQ = curSumSQ/numAcc;
         }
-
-        if ((millis()-lastACCpoint) > (10)) // Accelerometer every 10ms
-        {
-          lastACCpoint = millis();
-          mag = t.readXYZmagnitude();
-          filteredMag = round(convert(filter(mag))) * SpeedFactor * SuspensionFactor; //filter magnitude, convert to m/s^2
-          if(filteredMag > 0)
-          {
-            numACCpoints++;
-          }
-          sumsq = sumsq + (filteredMag*filteredMag);
-        }
-
         if(t.gpsFix())
         {
           int x;
@@ -209,10 +214,9 @@ void loop()
             myFile.println(allData);
             myFile.close();
           }
-
-          if(DEBUG == 2)
+          if(DEBUG == 2 || DEBUG == 5)
           {
-            String IMUstring = String::format("X is: %d, Y is: %d, Z is: %d, Mag is: %d", x, y, z, mag);
+            String IMUstring = String::format("Timestamp is %s and harshness value is: %d", stamp.c_str(), accel);
             String speedString = String::format("Speed is: %f at time: %s", speed, stamp.c_str());
             IMUfile.open("IMUData.txt", O_RDWR | O_AT_END);
             IMUfile.println(IMUstring);
