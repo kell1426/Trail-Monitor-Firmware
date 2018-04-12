@@ -171,10 +171,10 @@ void loop()
           int z;
           float speed;
           speed = t.getSpeed();
-          if(speed < 0.8) //Vehicle not in motion
-          {
-            break;
-          }
+          // if(speed < 0.8) //Vehicle not in motion
+          // {
+          //   break;
+          // }
           if(DEBUG == 2)
           {
             x = t.readX();
