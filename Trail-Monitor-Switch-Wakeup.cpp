@@ -44,6 +44,8 @@ float lastLon;
 enum State { WAKE_STATE, ACQUIRE_STATE, SEND_STATE, POWER_DOWN_STATE};
 State state = WAKE_STATE;
 int pin;
+int cellCount;
+bool cellConnectFail;
 
 String data1;
 String data2;
@@ -243,7 +245,25 @@ void loop()
       }
       Cellular.on();
       Cellular.connect();
+      cellCount = 0;
+      cellConnectFail = false;
       while(!Cellular.ready());
+      {
+        delay(10);
+        cellCount++;
+        if(cellCount > 10*100*60*5) //5 minutes
+        {
+          cellConnectFail = true;
+          break;
+        }
+      }
+      if(cellConnectFail == true)
+      {
+        state = POWER_DOWN_STATE;
+        Cellular.disconnect();
+        Cellular.off();
+        break;
+      }
       Particle.connect();
       myFile.open("TrailData.txt", O_RDWR | O_CREAT);
       char arr[256];
