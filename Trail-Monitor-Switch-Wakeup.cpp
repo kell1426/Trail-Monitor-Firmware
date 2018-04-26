@@ -80,21 +80,6 @@ void setup()
       }
   }
 
-  if (!sd.begin(chipSelect, SPI_HALF_SPEED))
-  {
-    sd.initErrorHalt();
-  }
-
-  myFile.open("TrailData.txt", O_RDWR | O_CREAT);
-  myFile.close();
-    if(DEBUG == 2 || DEBUG == 3 || DEBUG == 5)
-    {
-        IMUfile.open("IMUData.txt", O_RDWR | O_CREAT);
-        IMUfile.close();
-        SpeedFile.open("Speeddata.txt", O_RDWR | O_CREAT);
-        SpeedFile.close();
-    }
-
   t.begin();	//Set up Asset Tracker bits
 
   pinMode(WKPIN, INPUT_PULLDOWN);
@@ -108,14 +93,18 @@ void loop()
   switch(state)
   {
     case WAKE_STATE:
+      if (!sd.begin(chipSelect, SPI_HALF_SPEED))
+      {
+        sd.initErrorHalt();
+      }
       myFile.open("TrailData.txt", O_RDWR | O_CREAT);
       myFile.close();
-      if(DEBUG == 2)
+      if(DEBUG == 2 || DEBUG == 3 || DEBUG == 5)
       {
-        IMUfile.open("IMUData.txt", O_RDWR | O_CREAT);
-        IMUfile.close();
-        SpeedFile.open("Speeddata.txt", O_RDWR | O_CREAT);
-        SpeedFile.close();
+          IMUfile.open("IMUData.txt", O_RDWR | O_CREAT);
+          IMUfile.close();
+          SpeedFile.open("Speeddata.txt", O_RDWR | O_CREAT);
+          SpeedFile.close();
       }
       t.gpsOn();
       t.antennaExternal();
@@ -173,10 +162,10 @@ void loop()
           int z;
           float speed;
           speed = t.getSpeed();
-          // if(speed < 0.8) //Vehicle not in motion
-          // {
-          //   break;
-          // }
+          if(speed < 1.0) //Vehicle not in motion
+          {
+            break;
+          }
           if(DEBUG == 2)
           {
             x = t.readX();
@@ -186,7 +175,7 @@ void loop()
           }
           float lat = t.readLatDeg();
           float lon = t.readLonDeg();
-          if((lastLat == lat) && (lastLon = lon))
+          if((lastLat == lat) && (lastLon == lon))
           {
               break;
           }
