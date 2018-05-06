@@ -2,14 +2,16 @@
 
 ## Usage
 ### Flashing Compiled Code Downloaded from Particle Web IDE (named "Trail.bin") using Particle CLI Tool
+[Particle CLI Reference](https://docs.particle.io/reference/cli/)
 #### Windows:
 ```
-particle 
+particle flash --serial firmware.bin 
 ```
 #### UNIX:
 ```
 particle serial flash Trail.bin
 ```
+
 ## Debug Modes
 - Debug 0 is the normal operation mode.
 - Debug 1 is for serail connections and print outs to a terminal.
