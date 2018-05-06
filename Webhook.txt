@@ -1,0 +1,23 @@
+{
+  "deviceId": "{{PARTICLE_DEVICE_ID}}",
+  "data": [
+    {
+      "timeStamp": "{{T1}}",
+      "latitude": "{{La1}}",
+      "longitude": "{{Lo1}}",
+      "value": "{{H1}}"
+    },
+    {
+      "timeStamp": "{{T2}}",
+      "latitude": "{{La2}}",
+      "longitude": "{{Lo2}}",
+      "value": "{{H2}}"
+    },
+    {
+      "timeStamp": "{{T3}}",
+      "latitude": "{{La3}}",
+      "longitude": "{{Lo3}}",
+      "value": "{{H3}}"
+    }
+  ]
+}
