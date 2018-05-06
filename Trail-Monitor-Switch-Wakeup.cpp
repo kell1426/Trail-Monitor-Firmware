@@ -9,7 +9,6 @@
 
 
 // Pick an SPI configuration.
-// See SPI configuration section below (comments are for photon).
 #define SPI_CONFIGURATION 0
 //------------------------------------------------------------------------------
 // Setup SPI configuration.
@@ -18,12 +17,20 @@ SdFatSoftSpi<D3, D2, D4> sd;
 const uint8_t chipSelect = D5;
 #endif  // SPI_CONFIGURATION
 //------------------------------------------------------------------------------
-#define DEBUG 0
-#define range 4 //range attribute on particle, for filtering not setup
-#define SpeedFactor 1
-#define SuspensionFactor 2
+#define DEBUG 0 //Different debug values used throughout testing.
+// Debug 0 is the normal operation mode.
+// Debug 1 is for serail connections and print outs to a terminal.
+// Debug 2 prints out Accelerometer information to the "IMUData.txt" file as well as speed data to the "Speeddata.txt" file
+// Debug 3 used in earlier versions of code. No longer does anything
+// Debug 4 used in earlier versions of code. No longer does anything
+// Debug 5 prints out the acceleromter data used in the harshess algorithm to the "IMUData.txt" file as well as speed data to the "Speeddata.txt" file
+#define range 4 //range attribute on particle for filtering not setup
+#define SpeedFactor 1 //Speed factor to be implemeted later. Would dynamically adjust
+//based on the speed of the vehicle to account for different Accelerometer readings at different speeds.
+#define SuspensionFactor 2 //SuspensionFactor that is multiplied to the final harshness value.
+//Currently set to 2, calibrated to a car on street roads. Will need to be lowered for off road vehicles.
 int WKPIN = D1;
-SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC); //Does not automatically connect to particle cloud or cellular networks.
 File myFile;
 File exFile;
 File IMUfile;
@@ -68,19 +75,22 @@ uint32_t gpsTIme();
 float convert(float raw);
 float filter(float magnitude);
 
+// Function setup()
+// Sets up serial connection if on the correct debug
+// Initializes the asset tracker object "t", sets the pulldown resistor on the WKPIN
+// Sets up the interrupt to change from acquire state to send state
 void setup()
 {
   if(DEBUG == 1 || DEBUG == 3)
   {
       Serial.begin(9600);
-      // Wait for USB Serial
       while (!Serial)
       {
       SysCall::yield();
       }
   }
 
-  t.begin();	//Set up Asset Tracker bits
+  t.begin();
 
   pinMode(WKPIN, INPUT_PULLDOWN);
 
@@ -92,6 +102,10 @@ void loop()
 {
   switch(state)
   {
+    //Case WAKE_STATE
+    // Initializes the SD card, creates the files needed, turns on the GPS with the
+    // external antenna. If debug is 1, prints out information serially. Sets the state
+    // to the ACQUIRE_STATE state and breaks out.
     case WAKE_STATE:
       if (!sd.begin(chipSelect, SPI_HALF_SPEED))
       {
@@ -119,6 +133,18 @@ void loop()
       }
       state = ACQUIRE_STATE;
       break;
+    // Case ACQUIRE_STATE
+    // Updates the gps info. If debug is 1, prints out info serially.
+    // If the time is past the accelerometer delay (10 ms), grab an acceleromter point and filter it.
+    // If debug is 5, print this raw acceleromter point to the IMU file. If the magnitude is greater
+    // thn 0, increment the filtered mag count and add to the summed squated magnitude variable.
+    // If the time is past the GPS delay (1 sec), average the total summed squared magnitude.
+    // If the gps has a fix, grab all the necessary info for the gps point.
+    // Two checks are in place before storing this gps point. The first is if the speed is less than
+    // 1 knot, and if so break out and discard the data. The second checks if the gps point is the same
+    // as the last gps point, if so break out and discard the data.
+    // To print the data to the file, the data is first formatted. The first two points are written in the correct
+    // json format, and the third is written with a new line appended to it.
     case ACQUIRE_STATE:
       t.updateGPS();
       if(DEBUG == 1)
@@ -175,13 +201,11 @@ void loop()
           }
           float lat = t.readLatDeg();
           float lon = t.readLonDeg();
-          if((lastLat == lat) && (lastLon == lon))
+          if((lastLat == lat) && (lastLon == lon)) //Vehicle has not moved since last GPS point
           {
               break;
           }
-          //uint32_t epoch = initialTime + ((millis() - offset) / 1000);
           uint32_t epoch = gpsTime();
-          //uint32_t ms = millis() % 1000;
           uint32_t ms = millis() % 1000;
           String ms_string = ms_last3digit_grabber(ms);
           String stamp = String::format("%lu%s", epoch, ms_string.c_str());
@@ -221,6 +245,20 @@ void loop()
         }
       }
       break;
+    // Case SEND_STATE
+    // Device enters this state when the interrupt attached to the wake pin fires
+    // Truns off the gps unit, not needed to send out data
+    // If debug is 1, print out info serially
+    // Turn on the cellular modem and connect to a cellular network
+    // While loop at 269 checks if the time to connect to the cellular network has exceeded 5 minutes.
+    // If so set cellConnectFail to true and break out of loop
+    // If cellConnectFailis true, set the state to POWER_DOWN_STATE, turn of cellular modem and break out of SEND_STATE
+    // Connect to particle cloud and open the TrailData.txt file
+    // Next two blocks of code read the data stored in the file and send the points to the particle webook
+    // If at any point the vehicle turns on while sending the data, the remaining data will be written to
+    // TrailDataExtras.txt and enter the ACQUIRE_STATE. This cycle will then repeat.
+    // When done sending data, disconnect from Particle and cellular networks. Then shut off the cellular modem.
+    // Finally, set the state to POWER_DOWN_STATE and break out.
     case SEND_STATE:
       t.gpsOff();
       if(DEBUG == 1)
@@ -324,6 +362,11 @@ void loop()
         state = POWER_DOWN_STATE;
       }
       break;
+    // Case POWER_DOWN_STATE
+    // If debug is 1, print out info serially.
+    // Else put the device to sleep and wak on a rising edge on the WKPIN
+    // When the device wakes up, it will resume the code from the point it went to sleep
+    // Set the state to WAKE_STATE and break out
     case POWER_DOWN_STATE:
       if(DEBUG == 1)
       {
@@ -342,6 +385,9 @@ void loop()
   }
 }
 
+// Function sendStateChange()
+// Called when the interrupt fires on a falling edge of the WKPIN
+// Sets the state to SEND_STATE
 void sendStateChange()
 {
     state = SEND_STATE;
@@ -351,6 +397,14 @@ void sendStateChange()
     }
 }
 
+// Function ms_last3digit_grabber
+// Takes in the milliseconds of the device modded by 1000
+// Formats this number into a 3 digit String
+// Example:
+//   7 -> 007
+//   70 -> 070
+//   700 -> 700
+// Returns this new string
 String ms_last3digit_grabber(int ms)
 {
   String digits;
@@ -369,6 +423,8 @@ String ms_last3digit_grabber(int ms)
   return digits;
 }
 
+// Function gpsTime()
+// Returns the current epoch time
 uint32_t gpsTime()
 {
       struct tm T;
@@ -416,6 +472,8 @@ int filter(int magnitude) {
 	return abs(highpassValue);
 }
 
+//Funtion Convert
+//Takes in raw IMU data as an int
 //Convert from raw IMU to m/s^2
 float convert(int raw) {
 
