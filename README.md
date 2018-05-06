@@ -1,7 +1,7 @@
 # Trail-Monitor-Firmware
 
 ## Usage
-### Flashing Code Downloaded from Particle Web IDE
+### Flashing Compiled Code Downloaded from Particle Web IDE (named "Trail.bin") using Particle CLI Tool
 #### Windows:
 ```
 particle 
